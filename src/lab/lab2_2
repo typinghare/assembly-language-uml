@@ -1,0 +1,23 @@
+.data
+	arr: .word 0:10
+	
+.text
+	# Store $t0 and $t1 to the first and second elements of array
+	li $t0, 0xC			# Dummy data
+	li $t1, 0xF
+	la $s0, arr			# The address of the array
+	sw $t0, 0($s0)
+	sw $t1, 4($s0)
+	
+	lw $t2, 0($s0)		# Check the array values
+	lw $t3, 4($s0)
+	
+	# Add 2nd and 3rd elements of array arr, and save the sum in the 4th element
+	sw $t0, 8($s0)		# arr = [0xC, 0xF, 0xC, ...]
+	la $s0, arr
+	lw $t0, 4($s0)		# Load arr[1] to $t0
+	lw $t1, 8($s0)		# load arr[2] to $t1 
+	add $t2, $t0, $t1	# Add the two elements, and save the result to $t2
+	sw $t2, 12($s0)		# Save $t2 to arr[3]
+	
+	lw $t3, 12($s0)		# Check arr[3], which should be 0x1b
