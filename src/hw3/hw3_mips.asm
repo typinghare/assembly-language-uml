@@ -27,9 +27,9 @@
 		la $a0, Newline
 		syscall											# printf("\n")
 		
-		# Search 75 and print the result (should be 5)
+		# Search 11 and print the result (should be 4)
 		la $a0, Array
-		li $a1, 75
+		li $a1, 11
 		jal search										# $v0 = search(Array, 20)
 		move $a0, $v0									
 		li $v0, 1

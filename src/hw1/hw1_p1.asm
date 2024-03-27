@@ -23,7 +23,9 @@
 	main:											# int main() {
 		la $a0, x									#   int* $a0 = x;
 		li $t0, 0									#   int $t0 = 0;
-		lw $t1, N									#   int $t1 = N;
+		la $t8, N
+		lw $t1, ($t8)
+		# lw $t1, N									#   int $t1 = N;
 		li $t2, 1									#	int $t2 = 1;
 		li $t3, 20									#	int $t3 = 20;
 													#
