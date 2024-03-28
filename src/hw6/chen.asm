@@ -1,9 +1,16 @@
 # Copyright 2024 James Chen
 # Assembly Language, Homework 6
 
+# To graders: I enhanced my HW5 code by adhering to MIPS best practices and implementing optimizations in some 
+# loops. I examined the program using the specified test case outlined in the instructions and the output precisely
+# matches the expected output delineated in the instructions.
+# However, I didn't completely follow the pseudo-C code in the instructions (the updated version), as I found a
+# mistake in it: the "i" is set to be 2 in the case where the first token is a label in "labelDef". However, that
+# will not skip the instruction. I changed it into "i = 3", at line 454 in this file, and it worked finally.
+
 .data
 
-# Input line string buffer
+# Input line string buffer (length: 80 bytes)
 inBuf: 			.word 0:20		
 	
 # The index of the next character to process in inBuf
@@ -234,7 +241,7 @@ newlineCharacter:	.asciiz "\n"
 tabCharacter:		.asciiz "\t"
 inputStringPrompt: 	.asciiz "Please input a string: "
 errorMessage: 		.asciiz "Fatal error encountered!"
-tabSymString:		.asciiz "tabSym:\t"
+tabSymString:		.asciiz "tabSym:"
 
 .text
 .globl  main
@@ -257,13 +264,14 @@ nextState:		lw $t0, returnKey		# Stop when returnKey == 1
 nextStateEnd:
 				jal chkLabelDef			# Call chkLabelDef
 				move $a0, $v0			# The "i"
-				# jal chkInstruction	# Call chkInstruction
+				jal chkIns				# Call chkIns
 				jal printTabSymbol		# Print the symbol table
 				jal clearInBuf			# Clear inBuf
 				jal clearTabToken		# Clear the token table
 				lw $t0, loc				# LOC += 4	
 				addi $t0, $t0, 4
 				sw $t0, loc
+				sw $zero, returnKey		# Set the return key to zero
 				b mainLp				# Repeat the main loop
 mainLpEnd:
 				li $v0, 10				# Exit the program
@@ -359,7 +367,7 @@ nextChar:		lw $t0, inBufCharIndex	# Load the next character
 				sb $t0, inBufCharIndex
 nextCharRt:
 				jr $ra					# Return
-			
+
 # @brief Reads a line and store it to the inBuf.
 getLine:		la $a0, inputStringPrompt
 				li $v0, 4
@@ -386,43 +394,6 @@ charTypeFound:
 				move $v0, $t2					# Move $t2 to $v0 as return value
 				jr $ra							# Return
 
-# @brief Prints token table header; copies each entry of tabToken into prToken and print TOKEN.
-# @param $a3 The byte index to last entry in the tabToken.
-# @note This function is copied from the instruction.
-printToken: 	la $a0, tableHead
-				li $v0, 4
-				syscall							# Print the table header
-				li $t0, 0
-loopTok:		bge $t0, $a3, donePrTok			# Break the loop (loopTok) if $t0 >= $a3
-				lw $t1, tabToken($t0)			# Copy tabTok[] into prTok
-				sw $t1, prToken
-				lw $t1, tabToken + 4($t0)
-				sw $t1, prToken + 4
-				li	$t7, 0x20					# Blank in $t7 (0x20 is the space character)
-				li	$t9, -1						# For each char in prTok
-loopChar:		addi $t9, $t9, 1
-				bge	$t9, 8, tokType				# Break the loop (loopChar) if $t9 >= 8
-				lb	$t8, prToken($t9)
-				bne	$t8, $zero, loopChar		# Continue if char != 0
-				sb	$t7, prToken($t9)			# Replace the byte by ' ' (0x20) 
-				b	loopChar
-tokType: 		li	$t6, '\n'					# Store newline in $t6
-				sb	$t7, prToken + 8
-				lb	$t1, tabToken + 8($t0)
-				addi $t1, $t1, 0x30				# ASCII(token type)
-				sb	$t1, prToken+9
-				sb	$t6, prToken + 10			# Terminate with '\n'
-				sb	$0, prToken + 11
-				la	$a0, prToken				# Print token and its type
-				li	$v0, 4
-				syscall
-				addi $t0, $t0, 12
-				sw	$0, prToken					# Clear prToken
-				sw	$0, prToken + 4
-				b	loopTok
-donePrTok:
-				jr $ra
-
 # @brief Clears inBuf.
 clearInBuf: 	la $t0, inBuf					# Load the address of inBuf
 				li $t1, 80						# The length (bytes) of inBuf
@@ -433,6 +404,7 @@ clearInBufLp: 	beq $t2, $t1, clearInBufLpEnd	# Break the loop when i == 80
 				addi $t2, $t2, 1				# Increment i by 1
 				b clearInBufLp					# Repeat the loop
 clearInBufLpEnd:
+				sw $zero, inBufCharIndex		# Reset inBufCharIndex to 0
 				jr $ra							# Return
 		
 # @brief Clears the token table (tabToken).
@@ -440,13 +412,14 @@ clearTabToken:	la $t0, tabToken				# Load the address of tabToken
 				lw $t1, tabTokenIndex			# The index to the next available token
 				li $t2, 0						# Index (i)
 clearTabTokenLp:beq $t2, $t1, clearTabTokenLpEnd
-				lw $zero 0($t0)					# Clear the three words
-				lw $zero 4($t0)
-				lw $zero 8($t0)
+				sw $zero 0($t0)					# Clear the three words
+				sw $zero 4($t0)
+				sw $zero 8($t0)
 				addi $t0, $t0, 12				# Move the pointer to the next tabToken
 				addi $t2, $t2, 1				# increment i by 1
 				b clearTabTokenLp				# Repeat the loop
 clearTabTokenLpEnd:
+				sw $zero, tabTokenIndex			# Set tabTokenIndex to 0
 				jr $ra							# Return
 
 # @brief Appends a symbol.
@@ -478,7 +451,7 @@ chkLabelDef: 	la $t0, tabToken				# Load the address of tabToken
 				move $s7, $ra					# Save the return address
 				jal appendSymbol				# VAR(curToken, 1)
 				move $ra, $s7					# Restore the return address
-				li $v0, 2						# i = 2 (Skip ':' and instruction)
+				li $v0, 3						# i = 3 (Skip ':' and instruction)
 				b chkLabelDefReturn				
 chkLabelDefIns: 
 				li $v0, 1						# i = 1
@@ -488,8 +461,29 @@ chkLabelDefReturn:
 
 # @brief Checks the instruction.
 # @param $a0 The index of the first token to process.
-chkInstruction: li $t0, 1						# $t0 := paramStart = true
-				jr $ra
+chkIns: 		li $s0, 1						# $s0 := paramStart = true
+				move $s1, $a0					# $s1 := i
+chkForVar:		la $s2, tabToken				# Load the address of token table
+				mul $t0, $s1, 12				# Calculate the offset
+				add $s2, $s2, $t0				# Load the address of the token to process
+				lb $t0, ($s2)					# Load tabToken[i][0]
+				beq $t0, 0x23, chkInsRtn 		# If tabToken[i][0] == '#' (end character), return
+				beq $s0, $zero, chkForComma		# If not paramStart goto chkForComma
+				lw $t0, 8($s2)					# Load tabToken[i][1]
+				bne $t0, 2, chkForComma			# If tabToken[i][1] != 2 goto chkForComma
+				move $a0, $s2					# Move &taboToken[0] to $a0
+				li $a1, 0						# The status is 0
+				move $s7, $ra					# Store the return address
+				jal appendSymbol				# Call VAR(&taboToken[0], 0)
+				move $ra, $s7					# Restore the return address
+				b chkInsNext					# Process the next token
+chkForComma:	lb $t0, ($s2)					# Load tabToken[i][0]
+				li $s0, 0						# Set paramStart to false
+				bne $t0, 0x2C, chkInsNext		# If tabToken[i][0] == ',' goto chkInsNext
+				li, $s0, 1						# paramStart = true if tabToken[i][0] == ','
+chkInsNext:		addi $s1, $s1, 1				# i += 1
+				b chkForVar						# Repeat; process the next token
+chkInsRtn:		jr $ra							# Return
 
 # @brief Prints the symbol table.
 printTabSymbol: li $v0, 4
@@ -499,19 +493,23 @@ printTabSymbol: li $v0, 4
 				lw $s1, tabSymbolIndex			# Load the next available symbol index
 printTabSymbolLp:
 				bge $s0, $s1, printTabSymbolLpEnd
+				li $v0, 4						# Print the tab character
+				la $a0 tabCharacter			
+				syscall
 				sll $t0, $s0, 4					# Multiply $t0 by 16
 				la $t1, tabSymbol				# Load the address of symbol table
 				add $s2, $t0, $t1				# Load the address of destination symbol
-				li $t0, 0								
-				li $t1, 8
-printTabSymbolLp1:								# Print the token string character by character
-				bge $t0, $t1, printTabSymbolLp1End
-				
-printTabSymbolLp1End:
+				lw $a0, ($s2)					# Print the token string
+				move $s7, $ra					# Save the return address
+				jal printChars
+				lw $a0, 4($s2)
+				jal printChars
+				li $v0, 4						# Print the tab character
+				la $a0 tabCharacter			
+				syscall
 				lw $a0, 8($s2)					# Load the location
-				move $s7, $ra					
 				jal printHex					# Print the location
-				move $ra, $s7										
+				move $ra, $s7					# Restore the return address					
 				li $v0, 4						# Print the tab character
 				la $a0 tabCharacter			
 				syscall
@@ -533,21 +531,42 @@ printHex: 		move $t0, $s7					# Call hex2char without affecting $ra and $s7
 				jal hex2char
 				move $ra, $s7
 				move $s7, $t0
-				move $a0, $v0					# Store the return value to $a0
-				li $t1, 0
-				li $t2, 4
-printHexLp:		bge $t1, $t2, printHexRtn
+				move $a0, $v0
+				# Print four characters
+				li $t1, 0						# $t1 = i = 0
+				li $t2, 4						# $t2 := MAX_BYTES = 4
+printHexLp:		bge $t1, $t2, printHexRtn		# if i >= MAX_BYTES then return
 				li $v0, 11
 				syscall
-				srl $a0, $a0, 8					# Right shift 8 bytes to print the next character
+				srl $a0, $a0, 8					# Right shift 8 bits to print the next character
 				addi $t1, $t1, 1
 				b printHexLp					# Repeat
 printHexRtn:	jr $ra							# Return
+
+# @brief Prints a word as characters
+# @brief $a0 The word to print.
+printChars:		move $t0, $a0					# Move the word into $t0
+				li $t1, 0						# $t1 = i = 0
+				li $t2, 4						# $t2 := MAX_BYTES = 4
+printCharsLp:	bge $t1, $t2, printCharsRtn		# if i >= MAX_BYTES then return
+				andi $a0, $t0, 0xFF				# Get the rightmost byte
+				beq $a0, 0x0, printSpace		# Print a space if the character is \0
+				li $v0, 11						# Print the character
+				syscall
+				b printCharsNext				# Print the next character
+printSpace:		li $a0, 0x20					# Print a space
+				li $v0, 11
+				syscall
+printCharsNext:	addi $t1, $t1, 1
+				srl $t0, $t0, 8					# Right shift 8 bits to print the next character
+				b printCharsLp					# Repeat; print the next character
+printCharsRtn:	jr $ra							# Return
 				
 
 # @brief Converts a hex value into ASCII string.
 # @param $a0 The hex number to convert.
 # @param $v0 The ASCII string.
+# @note This code is copied from the instructions.
 hex2char:		sw $t0, saveReg($0)				# hex digit to proces
 				sw $t1, saveReg+4($0)			# 4-bit mask
 				sw $t9, saveReg+8($0)
@@ -558,7 +577,7 @@ nibble2char:	and $t0, $a0, $t1				# $t0 = least significant 4 bits of $a0
 				addi $t0, $t0, 0x30				# convert to hex digit; hex char '0' to '9'
 				b collect
 hexAlpha:		addi $t0, $t0, -10				# subtract hex # "A"
-				addi $t0, $t0, 0x61				# convert to hex char, a..f
+				addi $t0, $t0, 0x41				# convert to hex char, A .. F
 collect:		sll	$v0, $v0, 8					# make a room for a new hex char
 				or $v0, $v0, $t0				# collect the new hex char
 				srl	$a0, $a0, 4					# right shift $a0 for the next digit
