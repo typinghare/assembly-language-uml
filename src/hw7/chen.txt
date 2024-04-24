@@ -1,0 +1,73 @@
+; Homework 7 assignment (a)
+	pushq	%rbp                ; // Push the value of the base pointer onto the stack 
+	movq	%rsp, %rbp          ; // Set the base pointer to the current stack pointer
+	movq	%rdi, -24(%rbp)     ; // Store X to -24(%rbp)
+	movl	%esi, -28(%rbp)     ; // Store n to -28(%rbp)	
+	movl	$0, -4(%rbp)        ; int sum = 0;
+	movl	$0, -8(%rbp)        ; int i = 0;
+	jmp	.L2                     ; goto .L2
+.L3:
+	movl	-8(%rbp), %eax      ; %eax = i
+	cltq                        ; // Sign-extend %eax to %rdx (%eax does not change)
+	leaq	0(,%rax,4), %rdx    ; %rdx = %rax * 4 + 0   // Calculate the offset in bytes 
+	movq	-24(%rbp), %rax     ; %rax = X
+	addq	%rdx, %rax          ; %rdx += X     // %rdx = &X[i]
+	movl	(%rax), %eax        ; %eax = *(&X[i]) = X[i]
+	addl	%eax, -4(%rbp)      ; sum += X[i];
+	addl	$1, -8(%rbp)        ; i++; 
+.L2:
+	movl	-8(%rbp), %eax      ; %eax = i
+	cmpl	-28(%rbp), %eax     ; // Compare i and n 
+	jl	.L3                     ; if (i < n) goto .L3
+	movl	-4(%rbp), %eax      ; %eax = sum    // Return value
+	popq	%rbp                ; // Restore the base pointer
+	ret                         ; // Return from the function
+
+===================================================================================================
+
+; Homework 7 assignment (b)	
+    	pushq	%rbp                ; // Push the value of the base pointer onto the stack 
+	movq	%rsp, %rbp          ; // Set the base pointer to the current stack pointer 
+	movq	%rdi, -24(%rbp)     ; // Store x at -24(%rbp) 
+	movq	%rsi, -32(%rbp)     ; // Store y at -32(%rbp) 
+	movq	%rdx, -40(%rbp)     ; // Store z at -40(%rbp) 
+	movq	$1, -8(%rbp)        ; long w = 1;
+	cmpq	$6, -24(%rbp)       ; // Compare x and 6 
+	ja	.L2                     ; // if (x > 6) goto .L2;
+	movq	-24(%rbp), %rax     ; %rax = x
+	salq	$3, %rax            ; %rax *= 8
+	addq	$.L4, %rax          ; // Add offset to the address of the jump table
+	movq	(%rax), %rax        ; // Load the address of the target instruction
+	jmp	*%rax                   ; // Jump to the target instruction
+.L4:                            ; // Jump table
+	.quad	.L2                 ; // Address to defeault case
+	.quad	.L7                 ; // Address to case 1
+	.quad	.L6                 ; // Address to case 2 
+	.quad	.L5                 ; // Address to case 3 
+	.quad	.L2                 ; // Address to default case
+	.quad	.L3                 ; // Address to case 6
+	.quad	.L3                 ; // Address to case 6
+.L7:                            ; // case 1
+	movq	-32(%rbp), %rax     ; %rax = y
+	imulq	-40(%rbp), %rax     ; %rax *= z
+	movq	%rax, -8(%rbp)      ; w = y * z;
+	jmp	.L8                     ; break;
+.L6:                            ; // case 2
+	movq	-32(%rbp), %rax     ; %rax = y
+	cqto                        ; // Convert %rax to %rdx
+	idivq	-40(%rbp)           ; %rax /= z
+	movq	%rax, -8(%rbp)      ; w = y / z;
+.L5:                            ; // case 3
+	movq	-40(%rbp), %rax     ; %rax = z
+	addq	%rax, -8(%rbp)      ; w += z;
+                                ; // Fall through
+.L3:                            ; // case 6
+	movq	-40(%rbp), %rax     ; %rax = z
+	subq	%rax, -8(%rbp)      ; w -= z;
+	jmp	.L8                     ; break;
+.L2:                            ; // Default case
+	movq	$2, -8(%rbp)        ; w = 2;
+.L8:
+	movq	-8(%rbp), %rax      ; %rax = w  // Return value
+	popq	%rbp                ; // Restore the base pointer
+	ret                         ; // Return from the function
